@@ -14,6 +14,14 @@ The result figures compare all three methods at `epsilon = 1, 5, 10, 25, 50`; at
 
 The attacker is an honest-but-curious server. It observes client updates, trains on shadow clients, and predicts gender from the first layer. Report attack success rate (SR) and unweighted average success recall (UASR); report SER accuracy (ACC) and unweighted average recall (UAR).
 
+## Analysis and results notebook
+
+- Open [`notebooks/results_viewer.ipynb`](notebooks/results_viewer.ipynb) to view the currently available SER and attack results. The notebook loads local run JSON files and plots available results; rerun it after adding new runs.
+- Read [`paper_analysis_for_phd.md`](paper_analysis_for_phd.md) for a detailed account of the paper's methods, materials, threat model, system architecture, experimental design, findings, limitations, and research gaps mapped to the PhD topic.
+- Rebuild the notebook with `python scripts/build_results_notebook.py`.
+
+Run outputs under `outputs/` are local and excluded from version control. The notebook deliberately identifies pilot and incomplete results rather than presenting them as a completed replication.
+
 ## Published settings to reproduce
 
 - Dataset: CREMA-D; actors are the clients.
