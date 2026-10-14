@@ -1,0 +1,3 @@
+# Optional public x-vector extractor. Install into the project .venv.
+speechbrain==1.0.3
+huggingface_hub<1.0

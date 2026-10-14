@@ -1,0 +1,6 @@
+# Optional isolated TTS inference stack. Checkpoint download and inference are
+# not yet validated on this Windows CPU host.
+espnet[tts]==202610.post2
+espnet_model_zoo==0.1.11
+huggingface_hub==0.36.2
+pandas==3.0.6
