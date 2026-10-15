@@ -20,7 +20,7 @@ The attacker is an honest-but-curious server. It observes client updates, trains
 - Read [`paper_analysis_for_phd.md`](paper_analysis_for_phd.md) for a detailed account of the paper's methods, materials, threat model, system architecture, experimental design, findings, limitations, and research gaps mapped to the PhD topic.
 - Rebuild the notebook with `python scripts/build_results_notebook.py`.
 
-Run outputs under `outputs/` are local and excluded from version control. The notebook deliberately identifies pilot and incomplete results rather than presenting them as a completed replication.
+Run outputs under `outputs/` are local and excluded from version control. Use `scripts/summarize_reproduction.py` to write versionable fold-comparison tables under `results/`, then rebuild and run the notebook to inspect them.
 
 ## Published settings to reproduce
 
@@ -36,7 +36,7 @@ The unprotected table reports (attack SR/UASR; SER ACC/UAR): Fold 1 `0.837/0.829
 
 ## Important implementation gaps
 
-The paper does not give a complete data preprocessing recipe, actor fold assignments, random seeds, attack model architecture, UDP clipping/sensitivity details, or the exact Voice-Ind configuration/model checkpoints used. Gender-Ind also depends on a public gender-embedding pool, an embedding extractor, and an ESPnet-TTS synthesis pipeline. These choices will be recorded in `reproduction_decisions.md` as we resolve them. Any choice that changes the reported experiment will be labelled as a deviation rather than silently treated as exact replication.
+The paper does not publish the three fold actor assignments/seeds or the exact Voice-Ind/Gender-Ind embedding datasets and ESPnet checkpoints. The cited reference resolves the EmoBase representation, per-speaker normalization, attack network, and UDP clipping/noise calculation. All remaining pool/checkpoint and split substitutions are recorded in `reproduction_decisions.md` rather than silently treated as exact replication.
 
 The Kaggle download is included at `../data/crema-d/content/CREMA-D/`: 7,442 WAV clips across 91 actors, with `VideoDemographics.csv` and `processedResults/summaryTable.csv`. The dataset remains under its original ODbL/Database Contents License terms (see `../data/README.md`). The official reference implementation uses the multimodal crowd-vote labels, not the emotion code embedded in the filename; its map retains N/S/H/A and filters other labels. We follow that evidence-based mapping and record the paper's terminology discrepancy.
 
@@ -65,26 +65,29 @@ UDP uses the same training command with `--defense udp --epsilon 1` (repeat for 
 
 ## Reference implementation
 
-The authors' [public SER attribute-inference and UDP reference implementation](https://github.com/usc-sail/fed-ser-leakage) informed the adapted SER architecture, UDP assumptions, and first-layer attack CNN for the target paper's 30-shadow-actor setup. A local reference checkout is not bundled. The embedding replacement mechanism is implemented in `scripts/sample_privacy_embeddings.py`. `scripts/extract_speaker_embeddings.py` extracts public SpeechBrain VoxCeleb x-vectors and creates utterance and actor-mean pools. This is a documented checkpoint/pool substitution: the paper does not identify the exact extractor or checkpoint. The speech re-synthesis step remains necessary before these methods can be evaluated as audio defenses; the feature runner deliberately rejects embedding-only output.
+The authors' [public SER attribute-inference and UDP reference implementation](https://github.com/usc-sail/fed-ser-leakage) informs the SER architecture, per-speaker EmoBase normalization, UDP assumptions, first-layer attack CNN, and update-count cap when fewer than 5/10/100 observations are available. Run `scripts/run_core_grid.ps1 -Force` to execute the unprotected and UDP settings across all three folds. The per-run metadata records the training and privacy parameters.
 
-To prepare x-vectors, install the optional extractor and run:
+To prepare speaker and gender embeddings, install the optional extractor and run:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements-embeddings.txt
 .\.venv\Scripts\python.exe scripts\extract_speaker_embeddings.py outputs\manifest.csv
-.\.venv\Scripts\python.exe scripts\sample_privacy_embeddings.py outputs\embeddings\utterance_xvectors.npz outputs\embeddings\cremad_actor_pool.npz --method voice-ind --epsilon 10 --output outputs\embeddings\voice-ind-e10.npz
+.\.venv\Scripts\python.exe scripts\train_gender_embedding.py outputs\manifest.csv outputs\embeddings\utterance_xvectors.npz
+.\.venv\Scripts\python.exe scripts\prepare_embedding_replacements.py
 ```
 
-The isolated TTS environment was prepared at `.venv-espnet` because current ESPnet requires NumPy 2, while the main SER/OpenSMILE environment uses NumPy 1.26. To recreate it, install the pinned optional stack, then synthesize replacement-voice audio with the public ESPnet LibriTTS x-vector VITS model and re-extract EmoBase features:
+Voice-Ind uses speaker x-vectors. Gender-Ind uses a distinct 512-dimensional gender-supervised embedding trained from those x-vectors and CREMA-D actor sex labels. The held-out-actor gender classification score is saved with the embedding artifact. Both mechanisms select from CREMA-D actor-mean candidate pools with angular distance and exponential sampling at epsilon 1/5/10/25/50; the source actor is excluded. These public pool/model choices substitute for assets the paper does not identify.
+
+The isolated TTS environment uses NumPy 2 and SciPy 1.15+, separate from the main SER/OpenSMILE environment. The source-conditioned synthesis grid uses each original waveform as teacher-forced acoustic features while replacing the speaker vector:
 
 ```powershell
 C:\Users\charl\anaconda3\python.exe -m venv --system-site-packages .venv-espnet
-.venv-espnet\Scripts\python.exe -m pip install -r requirements-espnet.txt
-.venv-espnet\Scripts\python.exe scripts\synthesize_replacements_espnet.py outputs\manifest.csv outputs\embeddings\voice-ind-epsilon-10.npz --output-dir outputs\audio\voice-ind-e10
-.\.venv\Scripts\python.exe scripts\extract_emobase.py outputs\manifest.csv --audio-root outputs\audio\voice-ind-e10 --output outputs\features\voice-ind-e10.npz
+.venv-espnet\Scripts\python.exe -m pip install -c constraints-espnet.txt -r requirements-espnet.txt
+.venv-espnet\Scripts\python.exe scripts\synthesize_replacement_grid.py outputs\manifest.csv --method voice-ind --epsilons 1 5 10 25 50
+.\.venv\Scripts\python.exe scripts\extract_emobase.py outputs\manifest.csv --audio-root outputs\audio\voice-ind-e10 --output outputs\features\voice-ind-e10.npz --feature-cache outputs\features\synth-emobase-cache.npz
 ```
 
-The synthesis script uses the CREMA-D phrase codes to recover the spoken sentence and conditions an ESPnet VITS model on each sampled vector. This is an approximation, not an exact recreation of the paper's audio path: it substitutes a public checkpoint, substitutes the CREMA-D actor pool for the paper's unspecified public pool, and uses transcript-conditioned re-synthesis. Run the same two steps for Gender-Ind and each epsilon. The environment imports ESPnet, but the 375 MB Zenodo checkpoint download ran at roughly 30–70 kB/s on this host and was stopped before completion; audio resynthesis and the subsequent SER/attack metrics are still pending.
+This is closer to the paper's source-acoustic-feature plus replacement-embedding pipeline than transcript-only TTS, but it substitutes a public LibriTTS VITS checkpoint for the paper's ESPnet `egs/libritts/tts1` model. Run the same synthesis and feature extraction for Gender-Ind and each epsilon. Exact checkpoints, vocoder settings, and the external public embedding databases are not specified in the paper, so this remains a documented approximation rather than an exact numerical reproduction.
 
 Reference sources: [target 2023 paper (DOI)](https://doi.org/10.1109/ICASSP49357.2023.10096844), [authors' public SER attack/UDP implementation](https://github.com/usc-sail/fed-ser-leakage), [UDP paper](https://arxiv.org/abs/2204.02500), and [Voice-Ind paper](https://arxiv.org/abs/2004.07442).
 
@@ -96,7 +99,8 @@ Reference sources: [target 2023 paper (DOI)](https://doi.org/10.1109/ICASSP49357
 - [x] Prepare a deterministic three-fold manifest with 30 shadow actors per fold, the rest private, and each actor's 80/20 local train/validation partition.
 - [x] Extract EmoBase features (4,799 x 988) and create the adapted FedAvg/UDP and attack runners.
 - [x] Reconcile reference model, UDP, update-observation, and label choices with the target paper; document inferred details.
-- [x] Extract public SpeechBrain x-vectors and sample Voice-Ind/Gender-Ind replacement vectors on the epsilon grid (checkpoint and pool are recorded approximations).
-- [ ] Validate ESPnet VITS inference, synthesize Voice-Ind/Gender-Ind audio, and extract transformed-audio features.
-- [ ] Finish the unprotected baseline attack and compare with the paper's reported numbers.
-- [ ] Run baseline and defenses; compare metrics with the paper's tables/figures.
+- [x] Extract SpeechBrain speaker x-vectors; train a separate held-out-actor gender embedding model; sample replacement vectors over the epsilon grid.
+- [x] Validate one source-conditioned ESPnet VITS resynthesis clip.
+- [ ] Complete source-conditioned Voice-Ind/Gender-Ind synthesis and feature extraction over the epsilon grid.
+- [ ] Evaluate SER and gender attack metrics across all three folds and defense settings.
+- [ ] Compare per-fold outputs with the paper and document nonrecoverable split/checkpoint details, including actual update counts for the 100-requested setting.

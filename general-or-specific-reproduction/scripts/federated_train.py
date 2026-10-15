@@ -100,8 +100,12 @@ def main() -> None:
             continue
         train_x = np.stack([raw_x[feature_lookup[r["filename"]]] for r in train_rows]).astype(np.float32)
         val_x = np.stack([raw_x[feature_lookup[r["filename"]]] for r in val_rows]).astype(np.float32)
-        mean = np.nanmean(train_x, axis=0)
-        std = np.nanstd(train_x, axis=0)
+        # Match the authors' cited preprocessing implementation: z-normalize
+        # within actor using all clips assigned to that actor before the local
+        # train/validation split is applied to model fitting.
+        norm_x = np.stack([raw_x[feature_lookup[r["filename"]]] for r in actor_rows]).astype(np.float32)
+        mean = np.nanmean(norm_x, axis=0)
+        std = np.nanstd(norm_x, axis=0)
         train_x = np.nan_to_num((train_x - mean) / (std + 1e-5), nan=0.0, posinf=0.0, neginf=0.0)
         val_x = np.nan_to_num((val_x - mean) / (std + 1e-5), nan=0.0, posinf=0.0, neginf=0.0)
         label = lambda r: label_order[r["label"]]
@@ -215,7 +219,7 @@ def main() -> None:
         "fold": args.fold, "role": args.role, "defense": args.defense,
         "feature_privacy": args.feature_privacy,
         "epsilon": args.epsilon if args.defense != "none" else None,
-        "clients": len(client_ids), "rounds": args.rounds,
+        "clients": len(client_ids), "rounds": args.rounds, "seed": args.seed,
         "participation": args.participation, "local_epochs": args.local_epochs,
         "batch_size": args.batch_size, "learning_rate": args.learning_rate,
         "clip": args.clip if args.defense == "udp" else None,
@@ -228,6 +232,7 @@ def main() -> None:
         ] if args.defense == "udp" else None,
         "input_size": input_size,
         "features": str(args.features.resolve()),
+        "normalization": "per_actor_zscore_all_actor_clips_reference_preprocessing",
     }
     with (output_dir / "run.json").open("w", encoding="utf-8") as stream:
         json.dump(run_meta, stream, indent=2)

@@ -36,16 +36,17 @@ def main() -> None:
     if len(names) != len(source) or len(pool) == 0:
         raise ValueError("Embedding filenames must align with source vectors and the public pool cannot be empty")
 
+    if "actor_ids" in source_data:
+        source_actor_ids = source_data["actor_ids"].astype(str)
+    else:
+        source_actor_ids = np.asarray([name.split("_", 1)[0] for name in names], dtype=str)
+    if not isinstance(pool_data, np.lib.npyio.NpzFile) or "actor_ids" not in pool_data:
+        raise ValueError(f"{args.method} requires public_pool.npz with actor_ids for source-speaker exclusion")
+    pool_actor_ids = pool_data["actor_ids"].astype(str)
+    if len(source_actor_ids) != len(source):
+        raise ValueError("source actor_ids must align with source vectors")
+
     if args.method == "voice-ind":
-        if "actor_ids" in source_data:
-            source_actor_ids = source_data["actor_ids"].astype(str)
-        else:
-            source_actor_ids = np.asarray([name.split("_", 1)[0] for name in names], dtype=str)
-        if not isinstance(pool_data, np.lib.npyio.NpzFile) or "actor_ids" not in pool_data:
-            raise ValueError("Voice-Ind needs public_pool.npz with vectors and per-speaker actor_ids for self-exclusion")
-        pool_actor_ids = pool_data["actor_ids"].astype(str)
-        if len(source_actor_ids) != len(source):
-            raise ValueError("source actor_ids must align with source vectors")
         unique_actors = np.unique(source_actor_ids)
         actor_to_vector = {
             actor: source[source_actor_ids == actor].mean(axis=0)
@@ -53,9 +54,7 @@ def main() -> None:
         }
         mechanism_source = np.stack([actor_to_vector[actor] for actor in unique_actors])
     else:
-        source_actor_ids = np.asarray([name.split("_", 1)[0] for name in names], dtype=str)
         unique_actors = None
-        pool_actor_ids = None
         mechanism_source = source
 
     mechanism_source /= np.maximum(np.linalg.norm(mechanism_source, axis=1, keepdims=True), 1e-12)
@@ -65,6 +64,8 @@ def main() -> None:
     logits = -args.epsilon * angular_distance
     if args.method == "voice-ind":
         logits[unique_actors[:, None] == pool_actor_ids[None, :]] = -np.inf
+    else:
+        logits[source_actor_ids[:, None] == pool_actor_ids[None, :]] = -np.inf
     logits -= logits.max(axis=1, keepdims=True)
     probabilities = np.exp(logits)
     probabilities /= probabilities.sum(axis=1, keepdims=True)

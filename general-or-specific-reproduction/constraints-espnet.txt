@@ -1,4 +1,4 @@
-# Keep the scientific Python stack compatible with the existing CPU PyTorch
-# and OpenSMILE environment while resolving ESPnet's unconstrained NumPy dep.
-numpy<2
-scipy<1.15
+# ESPnet 202610.post2 and its current audio stack require the NumPy 2 ABI.
+# This environment is separate from SER/OpenSMILE, which uses NumPy 1.26.
+numpy>=2,<3
+scipy>=1.15,<2

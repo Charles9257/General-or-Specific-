@@ -1,0 +1,22 @@
+source,fold,defense,epsilon,accuracy,uar,round,normalization,artifact
+reproduction,1,none,,0.7063252925872803,0.7032878994941711,200,per_actor_zscore_all_actor_clips_reference_preprocessing,outputs/runs/fold1/private/none/ser_validation.json
+reproduction,1,udp,1.0,0.5286144614219666,0.519073061645031,200,per_actor_zscore_all_actor_clips_reference_preprocessing,outputs/runs/fold1/private/udp/epsilon_1/ser_validation.json
+reproduction,1,udp,10.0,0.6852409839630127,0.684676393866539,200,per_actor_zscore_all_actor_clips_reference_preprocessing,outputs/runs/fold1/private/udp/epsilon_10/ser_validation.json
+reproduction,1,udp,25.0,0.6957831382751465,0.6976291686296463,200,per_actor_zscore_all_actor_clips_reference_preprocessing,outputs/runs/fold1/private/udp/epsilon_25/ser_validation.json
+reproduction,1,udp,5.0,0.6897590160369873,0.6792110353708267,200,per_actor_zscore_all_actor_clips_reference_preprocessing,outputs/runs/fold1/private/udp/epsilon_5/ser_validation.json
+reproduction,1,udp,50.0,0.6867470145225525,0.6913063675165176,200,per_actor_zscore_all_actor_clips_reference_preprocessing,outputs/runs/fold1/private/udp/epsilon_50/ser_validation.json
+reproduction,2,none,,0.712592601776123,0.6706163063645363,200,per_actor_zscore_all_actor_clips_reference_preprocessing,outputs/runs/fold2/private/none/ser_validation.json
+reproduction,2,udp,1.0,0.5703703761100769,0.5000062622129917,200,per_actor_zscore_all_actor_clips_reference_preprocessing,outputs/runs/fold2/private/udp/epsilon_1/ser_validation.json
+reproduction,2,udp,10.0,0.7155555486679077,0.6651151478290558,200,per_actor_zscore_all_actor_clips_reference_preprocessing,outputs/runs/fold2/private/udp/epsilon_10/ser_validation.json
+reproduction,2,udp,25.0,0.6962962746620178,0.6645574271678925,200,per_actor_zscore_all_actor_clips_reference_preprocessing,outputs/runs/fold2/private/udp/epsilon_25/ser_validation.json
+reproduction,2,udp,5.0,0.7066666483879089,0.6484097167849541,200,per_actor_zscore_all_actor_clips_reference_preprocessing,outputs/runs/fold2/private/udp/epsilon_5/ser_validation.json
+reproduction,2,udp,50.0,0.7096296548843384,0.6691598072648048,200,per_actor_zscore_all_actor_clips_reference_preprocessing,outputs/runs/fold2/private/udp/epsilon_50/ser_validation.json
+reproduction,3,none,,0.7219731211662292,0.6683512851595879,200,per_actor_zscore_all_actor_clips_reference_preprocessing,outputs/runs/fold3/private/none/ser_validation.json
+reproduction,3,udp,1.0,0.5396113395690918,0.4968741238117218,200,per_actor_zscore_all_actor_clips_reference_preprocessing,outputs/runs/fold3/private/udp/epsilon_1/ser_validation.json
+reproduction,3,udp,10.0,0.707025408744812,0.6483272016048431,200,per_actor_zscore_all_actor_clips_reference_preprocessing,outputs/runs/fold3/private/udp/epsilon_10/ser_validation.json
+reproduction,3,udp,25.0,0.7174887657165527,0.6687834039330482,200,per_actor_zscore_all_actor_clips_reference_preprocessing,outputs/runs/fold3/private/udp/epsilon_25/ser_validation.json
+reproduction,3,udp,5.0,0.6905829310417175,0.6312185674905777,200,per_actor_zscore_all_actor_clips_reference_preprocessing,outputs/runs/fold3/private/udp/epsilon_5/ser_validation.json
+reproduction,3,udp,50.0,0.71898353099823,0.6708753332495689,200,per_actor_zscore_all_actor_clips_reference_preprocessing,outputs/runs/fold3/private/udp/epsilon_50/ser_validation.json
+paper,1,none,,0.663,0.595,,paper-reported,attached paper Table 1
+paper,2,none,,0.666,0.601,,paper-reported,attached paper Table 1
+paper,3,none,,0.656,0.619,,paper-reported,attached paper Table 1

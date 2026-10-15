@@ -14,17 +14,15 @@ cells = [
     nbf.v4.new_markdown_cell(
         """# Results viewer: *General or Specific?*
 
-This notebook loads the local JSON run artifacts for the CREMA-D reproduction, summarizes SER validation and gender-attack metrics, and plots the runs that are actually available. Run it from any directory; paths are resolved relative to this notebook.
+This notebook loads the local JSON run artifacts for the three-fold CREMA-D reproduction, summarizes SER validation and gender-attack metrics, and plots the runs that are actually available. Run it from any directory; paths are resolved relative to this notebook.
 
 ## Current evidence at a glance
 
-The current fold-1 pilot has an unprotected SER validation result of **ACC 0.7063 / UAR 0.7009** and UDP at epsilon 10 of **ACC 0.6867 / UAR 0.6815**. A fast, downsampled CPU gender-attack pilot using five updates reports **SR 0.6492 / UASR 0.6352**. The attack result is a runtime-deviation diagnostic; it is not directly comparable with the paper's fold-1 baseline attack result (**0.837 / 0.829**). Voice-Ind/Gender-Ind and the full attack evaluation remain incomplete.
-
-These are pilot results, not a completed replication. The paper reports 3-fold baseline metrics and defence curves; the notebook will show missing runs as missing rather than treating them as zero.
+The notebook reads fold-level baseline and defense artifacts from `outputs/runs/`. It compares the available outputs against the paper's three-fold reference table and makes missing settings visible instead of treating them as zero. Results remain conditional on the documented data splits, reference-code preprocessing choices, and any substituted Voice-Ind/Gender-Ind assets.
 
 ## Methods and provenance
 
-The target study uses CREMA-D, actor-level clients, FedAvg, a two-hidden-layer SER network, a shadow-client gender attack on first-layer updates, and UDP, Voice-Ind, and Gender-Ind. The project details and deviations are in [`paper_analysis_for_phd.md`](../paper_analysis_for_phd.md) and [`reproduction_decisions.md`](../reproduction_decisions.md). Run outputs are local under `outputs/runs/` and are intentionally excluded from version control. The notebook reads any matching artifacts found there.
+The target study uses CREMA-D, actor-level clients, FedAvg, a two-hidden-layer SER network, a shadow-client gender attack on first-layer updates, and UDP, Voice-Ind, and Gender-Ind. Per-speaker EmoBase normalization follows the cited reference implementation. The project details and deviations are in [`paper_analysis_for_phd.md`](../paper_analysis_for_phd.md) and [`reproduction_decisions.md`](../reproduction_decisions.md). Run outputs are local under `outputs/runs/` and are intentionally excluded from version control. The notebook reads any matching artifacts found there.
 """
     ),
     nbf.v4.new_code_cell(
@@ -92,6 +90,10 @@ for path in attack_files:
     attack_rows.append({
         "run": path.stem,
         "updates per client": result.get("num_samples_per_client"),
+        "fold": result.get("fold"),
+        "defense": result.get("defense"),
+        "epsilon": result.get("epsilon"),
+        "private update count min/mean/max": result.get("observed_samples_per_private_client"),
         "downsampled attack": result.get("attack_model_downsampled"),
         "shadow actors": result.get("shadow_actors"),
         "private actors": result.get("private_actors"),
@@ -105,7 +107,7 @@ if not attack_df.empty:
 else:
     print("No attack result JSON files found yet.")"""
     ),
-    nbf.v4.new_markdown_cell("## 2. SER utility over federated rounds\n\nThe chart shows private-client validation metrics available in the run artifacts. It is a fold-1 pilot comparison; it does not average across the paper's three folds. The paper's fold-1 and three-fold baseline values are shown separately for context."),
+    nbf.v4.new_markdown_cell("## 2. SER utility over federated rounds\n\nThe chart shows private-client validation metrics from every available fold/defense artifact. The final-round table and the paper comparison below are the primary summary; the curves show training dynamics."),
     nbf.v4.new_code_cell(
         """def load_rounds(path: Path):
     payload = read_json(path)
@@ -137,27 +139,25 @@ else:
     axes[0].set(title="SER validation accuracy", xlabel="FedAvg round", ylabel="Accuracy")
     axes[1].set(title="SER validation unweighted average recall", xlabel="FedAvg round", ylabel="UAR")
     axes[1].legend(frameon=True, fontsize=9)
-    fig.suptitle("Available private-client pilot runs", y=1.03, fontsize=14)
+    fig.suptitle("Available private-client runs by fold and defense", y=1.03, fontsize=14)
     fig.tight_layout()
     plt.show()"""
     ),
-    nbf.v4.new_markdown_cell("## 3. Published baseline versus current pilot\n\nThe published values below are reported in the target paper's baseline table. The local pilot uses an inferred feature pipeline and a different actor split; the comparison is diagnostic, not a controlled replication estimate."),
+    nbf.v4.new_markdown_cell("## 3. Paper baseline versus reproduction runs\n\nThe published values below are reported in the target paper's baseline table. Each local fold uses the recorded deterministic actor split and the preprocessing choices documented in `reproduction_decisions.md`; the paper's exact fold seeds and Voice-Ind/Gender-Ind assets are unavailable, so interpret gaps as reproduction differences rather than exact replication error."),
     nbf.v4.new_code_cell(
         """paper_mean = PAPER_BASELINE[["ser_acc", "ser_uar"]].mean()
-paper_fold1 = PAPER_BASELINE.loc[PAPER_BASELINE["fold"] == 1].iloc[0]
 local_baseline = validation_df[(validation_df["role"] == "private") & (validation_df["defense"] == "none")]
 local_udp10 = validation_df[(validation_df["role"] == "private") & (validation_df["defense"] == "udp") & (validation_df["epsilon"] == 10)]
 
-comparison_rows = [
-    {"source": "Paper baseline · fold 1", "SER ACC": paper_fold1["ser_acc"], "SER UAR": paper_fold1["ser_uar"]},
-    {"source": "Paper baseline · mean of 3 folds", "SER ACC": paper_mean["ser_acc"], "SER UAR": paper_mean["ser_uar"]},
-]
-for label, subset in [("Local pilot · no protection", local_baseline), ("Local pilot · UDP ε=10", local_udp10)]:
-    if not subset.empty:
-        row = subset.iloc[0]
-        comparison_rows.append({"source": label, "SER ACC": row["SER ACC"], "SER UAR": row["SER UAR"]})
+comparison_rows = []
+for _, row in PAPER_BASELINE.iterrows():
+    comparison_rows.append({"source": f"Paper · fold {row['fold']}", "fold": row["fold"], "SER ACC": row["ser_acc"], "SER UAR": row["ser_uar"]})
+for frame, label in [(local_baseline, "Local · no protection"), (local_udp10, "Local · UDP ε=10")]:
+    for _, row in frame.iterrows():
+        comparison_rows.append({"source": f"{label} · fold {row['fold']}", "fold": row["fold"], "SER ACC": row["SER ACC"], "SER UAR": row["SER UAR"]})
+comparison_rows.append({"source": "Paper · 3-fold mean", "fold": "mean", "SER ACC": paper_mean["ser_acc"], "SER UAR": paper_mean["ser_uar"]})
 comparison_df = pd.DataFrame(comparison_rows)
-display(comparison_df.round(4))
+display(comparison_df.drop(columns="fold").round(4))
 
 fig, ax = plt.subplots(figsize=(9, 4.8))
 x = np.arange(len(comparison_df))
@@ -167,12 +167,12 @@ ax.bar(x + width/2, comparison_df["SER UAR"], width, label="UAR", color="#f59e0b
 ax.set_xticks(x, comparison_df["source"], rotation=12, ha="right")
 ax.set_ylim(0, 1)
 ax.set_ylabel("Score")
-ax.set_title("Paper reference and local pilot SER metrics")
+ax.set_title("Paper baseline and local three-fold SER metrics")
 ax.legend()
 fig.tight_layout()
 plt.show()"""
     ),
-    nbf.v4.new_markdown_cell("## 4. Gender-inference attack results\n\nThe target paper's table reports a three-fold unprotected baseline. The fast local pilot used a downsampled attack network on CPU, so it is plotted as a separate diagnostic. Do not interpret the difference as a defence effect."),
+    nbf.v4.new_markdown_cell("## 4. Gender-inference attack results\n\nThe target paper reports unprotected SR/UASR for each fold and privacy curves by requested attack-gradient count. Local attack files include the fold, defense, requested sample count, attack model type, and actual update-count distribution; keep fast/downsampled CNN results distinct from the reference CNN."),
     nbf.v4.new_code_cell(
         """paper_attack = PAPER_BASELINE[["fold", "attack_sr", "attack_uasr"]].copy()
 paper_attack["source"] = "Paper baseline"
@@ -180,11 +180,13 @@ attack_comparison = paper_attack.melt(id_vars=["fold", "source"], value_vars=["a
 
 if not attack_df.empty:
     for _, row in attack_df.iterrows():
+        model_tag = "fast" if row["downsampled attack"] else "reference"
+        source = f"Local {row['defense']} ε={row['epsilon']} n={row['updates per client']} ({model_tag})"
         attack_comparison = pd.concat([attack_comparison, pd.DataFrame([{
-            "fold": "Pilot", "source": f"Local fast pilot · {row['updates per client']} updates",
+            "fold": row["fold"], "source": source,
             "metric": "attack_sr", "score": row["attack SR"]
         }, {
-            "fold": "Pilot", "source": f"Local fast pilot · {row['updates per client']} updates",
+            "fold": row["fold"], "source": source,
             "metric": "attack_uasr", "score": row["attack UASR"]
         }])], ignore_index=True)
 
@@ -197,24 +199,22 @@ for ax, metric, title in zip(axes, ["attack_sr", "attack_uasr"], ["Attack succes
     ax.set(title=title, xlabel="Fold / diagnostic", ylabel="Score", ylim=(0, 1))
     ax.tick_params(axis="x", rotation=20)
 axes[1].legend(frameon=True, fontsize=8)
-fig.suptitle("Published attack baseline and non-comparable local diagnostic", y=1.03)
+fig.suptitle("Published attack baseline and local defense runs", y=1.03)
 fig.tight_layout()
 plt.show()"""
     ),
     nbf.v4.new_markdown_cell(
-        """## 5. Results interpretation and next steps
+        """## 5. Interpretation and reproduction caveats
 
-The current SER pilot shows higher validation scores than the paper's fold-1 baseline without protection, while UDP at epsilon 10 is slightly lower than this local baseline. Those differences cannot be attributed to the defence alone because feature extraction/normalization and actor fold assignments are not identical to a fully specified paper protocol.
+Compare the local values fold by fold with the paper table and figures. Report discrepancies as evidence about the reproduction pipeline; do not attribute them to a defense without controlling the feature, label, actor-split, checkpoint, and attack-model settings. The attack artifact records the actual number of available updates per client. When requested n=100 exceeds a client's observed history, the reference procedure uses that client's full available history.
 
-The current fast attack diagnostic is lower than the published baseline, but it uses a downsampled network and is explicitly marked as a runtime deviation. It cannot establish that the attack has been mitigated. Voice-Ind and Gender-Ind have no downstream audio/SER/attack results in the available outputs, so no privacy-utility comparison across all three defences is available yet.
+For UDP, ε labels follow the cited reference formula and its δ=0.5 assumption; they are not presented as independently audited formal guarantees. For Voice-Ind and Gender-Ind, distinguish the paper's exact algorithms from local embedding/checkpoint substitutions. All three-fold averages should be accompanied by fold-level values and the split seed.
 
 ### Reproduction checklist
 
-- [ ] Validate the exact emotion-label mapping and align preprocessing/features with author materials where possible.
-- [ ] Run the full attack architecture on all three folds for 5, 10, and 100 observed updates.
-- [ ] Complete the UDP epsilon sweep and audit clipping, adjacency, sampling, composition, and delta assumptions.
-- [ ] Validate ESPnet synthesis; complete transformed-audio feature extraction and Voice-Ind/Gender-Ind training.
-- [ ] Report per-fold and multi-seed means with uncertainty, plus class-wise and subgroup metrics.
+- [ ] Run the source-conditioned Voice-Ind and Gender-Ind feature grids and all fold-level SER/attack evaluations.
+- [ ] Keep the exact-vs-inferred decisions current in `reproduction_decisions.md`.
+- [ ] Report fold-level and aggregate means/spread only for available settings; add class-wise/subgroup and audio quality analyses for the thesis study.
 
 ### Reading the paper-to-thesis analysis
 

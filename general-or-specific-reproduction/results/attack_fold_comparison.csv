@@ -1,0 +1,5 @@
+source,fold,defense,epsilon,requested_updates,attack_model_downsampled,success_rate,uasr,private_updates_min,private_updates_mean,private_updates_max,shadow_updates_min,shadow_updates_mean,shadow_updates_max,artifact
+reproduction,1,none,,5,True,0.660655737704918,0.6403050108932462,12,19.672131147540984,28,14,20.0,29,outputs/runs/fold1/attack_none_n5.json
+reproduction,,,,5,,0.6491803278688525,0.6351579520697168,,,,,,,outputs/runs/fold1/attack_none_n5_fast.json
+reproduction,,,,5,,0.6057377049180328,0.5809368191721134,,,,,,,outputs/runs/fold1/attack_none_n5_fast_pilot.json
+reproduction,1,udp,1.0,5,True,0.5229508196721312,0.524400871459695,12,19.672131147540984,28,14,20.0,29,outputs/runs/fold1/attack_udp_epsilon_1_n5.json

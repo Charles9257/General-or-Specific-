@@ -1,5 +1,5 @@
-# Optional isolated TTS inference stack. Checkpoint download and inference are
-# not yet validated on this Windows CPU host.
+# Optional isolated TTS inference stack. A one-clip source-conditioned VITS
+# smoke inference has completed; full epsilon sweeps remain a separate run.
 espnet[tts]==202610.post2
 espnet_model_zoo==0.1.11
 huggingface_hub==0.36.2

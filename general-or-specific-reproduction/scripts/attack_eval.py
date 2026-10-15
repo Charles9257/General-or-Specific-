@@ -29,7 +29,7 @@ def load_updates(path: Path) -> dict[int, dict[str, object]]:
     return result
 
 
-def samples_by_actor(data: dict[int, dict[str, object]], n: int, seed: int, repeats: int = 20):
+def samples_by_actor(data: dict[int, dict[str, object]], n: int, seed: int, repeats: int = 10):
     weights, biases, labels = [], [], []
     rng = np.random.default_rng(seed)
     for actor in sorted(data):
@@ -37,6 +37,9 @@ def samples_by_actor(data: dict[int, dict[str, object]], n: int, seed: int, repe
         available = len(actor_data["weight"])
         if available == 0:
             continue
+        # Match the upstream reference behavior: use all available updates
+        # when fewer than the requested count exist. Record the actual count
+        # distribution in the result so 100 is not mistaken for 100 per actor.
         take = min(n, available)
         for _ in range(repeats):
             indices = rng.choice(available, size=take, replace=False)
@@ -51,6 +54,9 @@ def main() -> None:
     parser.add_argument("--shadow", type=Path, required=True)
     parser.add_argument("--private", type=Path, required=True)
     parser.add_argument("--num-samples", type=int, choices=(5, 10, 100), default=5)
+    parser.add_argument("--fold", type=int, choices=(1, 2, 3), help="Fold identifier for the saved result")
+    parser.add_argument("--defense", choices=("none", "udp", "voice-ind", "gender-ind"), help="Defense identifier for the saved result")
+    parser.add_argument("--epsilon", type=float, help="Privacy parameter for the saved result")
     parser.add_argument("--seed", type=int, default=2023)
     parser.add_argument("--epochs", type=int, default=40)
     parser.add_argument("--fast", action="store_true",
@@ -71,6 +77,8 @@ def main() -> None:
 
     shadow = load_updates(args.shadow)
     private = load_updates(args.private)
+    shadow_counts = np.asarray([len(item["weight"]) for item in shadow.values()], dtype=np.int64)
+    private_counts = np.asarray([len(item["weight"]) for item in private.values()], dtype=np.int64)
     train_w, train_b, train_y = samples_by_actor(shadow, args.num_samples, args.seed)
     test_w, test_b, test_y = samples_by_actor(private, args.num_samples, args.seed + 1)
 
@@ -159,6 +167,19 @@ def main() -> None:
             y_pred.extend(logits.argmax(dim=1).numpy().tolist())
     result = {
         "num_samples_per_client": args.num_samples,
+        "fold": args.fold,
+        "defense": args.defense,
+        "epsilon": args.epsilon,
+        "observed_samples_per_private_client": {
+            "min": int(private_counts.min()),
+            "max": int(private_counts.max()),
+            "mean": float(private_counts.mean()),
+        },
+        "observed_samples_per_shadow_client": {
+            "min": int(shadow_counts.min()),
+            "max": int(shadow_counts.max()),
+            "mean": float(shadow_counts.mean()),
+        },
         "attack_model_downsampled": bool(args.fast),
         "shadow_actors": len(shadow),
         "private_actors": len(private),
