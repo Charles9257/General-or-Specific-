@@ -18,7 +18,7 @@ This notebook is the results dashboard for the three-fold CREMA-D reproduction. 
 
 ## Current evidence at a glance
 
-The current run has all three baseline and UDP SER folds, all 15 UDP settings, a five-epsilon source-conditioned audio grid for each targeted defense, and baseline/UDP attack artifacts. Baseline SER mean ACC/UAR is 0.7136/0.6808, compared with the paper's 0.6617/0.6050. UDP mean SER ACC/UAR ranges from 0.5462/0.5053 (ε=1) to 0.7051/0.6771 (ε=50). Voice-Ind/Gender-Ind audio feature extraction and their FL/attack evaluations are not yet in `outputs/runs/`; audio generation is not an evaluated defense. Local attack CNN results use a CPU-friendly downsampled diagnostic and are not directly comparable to the paper's full attack model. The generated audio itself is kept locally; its 10-setting clip counts are in [`results/audio_generation_manifest.csv`](../results/audio_generation_manifest.csv).
+The project evaluates three defenses: UDP, Voice-Ind, and Gender-Ind. The notebook loads fold-level private-client SER accuracy/UAR and gender-inference SR/UASR from local run artifacts, with mean and spread across folds. Voice-Ind/Gender-Ind rely on a substitute public embedding pool and LibriTTS VITS checkpoint because the paper does not identify its exact assets. Local attack CNN results use a CPU-friendly downsampled diagnostic and are not directly comparable to the paper's full attack model. Generated audio is kept locally; its 10-setting clip counts are in [`results/audio_generation_manifest.csv`](../results/audio_generation_manifest.csv).
 
 | Fold | Paper baseline ACC/UAR | Reproduction ACC/UAR |
 |---|---:|---:|
@@ -97,12 +97,22 @@ if validation_df.empty:
         print("Using committed fold summary CSV; local round-history JSON files are not present.")
 if not validation_df.empty:
     display(validation_df.sort_values(["fold", "role", "defense", "epsilon"], na_position="first").reset_index(drop=True).round(4))
+    private_validation = validation_df[validation_df["role"] == "private"].copy()
+    if not private_validation.empty:
+        utility_summary = private_validation.groupby(["defense", "epsilon"], dropna=False).agg(
+            folds=("fold", "nunique"), mean_ACC=("SER ACC", "mean"), sd_ACC=("SER ACC", lambda values: values.std(ddof=0)),
+            mean_UAR=("SER UAR", "mean"), sd_UAR=("SER UAR", lambda values: values.std(ddof=0)),
+        ).reset_index()
+        print("Private-client SER utility by defense and epsilon (population includes the available folds):")
+        display(utility_summary.round(4))
 else:
     print("No ser_validation.json files found yet.")
 
 attack_rows = []
 for path in attack_files:
     result = read_json(path)
+    if not result.get("defense"):
+        continue  # Ignore legacy pilot artifacts without the current metadata schema.
     fold = result.get("fold")
     if fold is None:
         for part in path.parts:
@@ -138,6 +148,12 @@ if attack_df.empty:
         print("Using committed attack summary CSV; local attack JSON files are not present.")
 if not attack_df.empty:
     display(attack_df.round(4))
+    attack_summary = attack_df.groupby(["defense", "epsilon", "updates per client"], dropna=False).agg(
+        folds=("fold", "nunique"), mean_SR=("attack SR", "mean"), sd_SR=("attack SR", lambda values: values.std(ddof=0)),
+        mean_UASR=("attack UASR", "mean"), sd_UASR=("attack UASR", lambda values: values.std(ddof=0)),
+    ).reset_index()
+    print("Gender-inference attack comparison by defense, epsilon, and requested update count:")
+    display(attack_summary.round(4))
 else:
     print("No attack result JSON files found yet.")"""
     ),
@@ -167,39 +183,33 @@ display(audio_status_df)
 print("Completed SER defense runs:", ", ".join(sorted(validation_defenses)) or "none")
 print("Audio generation alone does not establish privacy or utility; transformed features, client training, and attack evaluation are required.")"""
     ),
-    nbf.v4.new_markdown_cell("## 2. SER utility over federated rounds\n\nThe chart shows private-client validation metrics from every available fold/defense artifact. The final-round table and the paper comparison below are the primary summary; the curves show training dynamics."),
+    nbf.v4.new_markdown_cell("## 2. Three-defense SER utility comparison\n\nThe plots show mean private-client validation accuracy and UAR across folds at each epsilon. Error bars show the fold-level standard deviation. Fold-level results remain available in the table above and the generated CSV."),
     nbf.v4.new_code_cell(
-        """def load_rounds(path: Path):
-    payload = read_json(path)
-    frame = pd.DataFrame(payload.get("rounds", []))
-    if frame.empty:
-        return frame
-    frame["artifact"] = path.relative_to(PROJECT_ROOT).as_posix()
-    meta_path = path.with_name("run.json")
-    meta = read_json(meta_path) if meta_path.exists() else {}
-    frame["defense"] = meta.get("defense", "unknown")
-    frame["epsilon"] = meta.get("epsilon")
-    frame["role"] = meta.get("role", "unknown")
-    frame["fold"] = meta.get("fold", "?")
-    return frame
-
-round_frames = [load_rounds(path) for path in validation_files]
-round_frames = [frame for frame in round_frames if not frame.empty and (frame["role"] == "private").all()]
-round_df = pd.concat(round_frames, ignore_index=True) if round_frames else pd.DataFrame()
-
-if round_df.empty:
-    print("No per-round private-client validation series are available.")
+        """private_validation = validation_df[validation_df["role"] == "private"].copy()
+if private_validation.empty:
+    print("No private-client SER validation rows are available.")
 else:
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.5), sharex=True)
-    for (fold, defense, epsilon), group in round_df.groupby(["fold", "defense", "epsilon"], dropna=False):
-        label = f"Fold {fold} · {defense}" + (f" ε={epsilon:g}" if pd.notna(epsilon) else "")
-        group = group.sort_values("round")
-        axes[0].plot(group["round"], group["accuracy"], label=label, linewidth=2)
-        axes[1].plot(group["round"], group["uar"], label=label, linewidth=2)
-    axes[0].set(title="SER validation accuracy", xlabel="FedAvg round", ylabel="Accuracy")
-    axes[1].set(title="SER validation unweighted average recall", xlabel="FedAvg round", ylabel="UAR")
-    axes[1].legend(frameon=True, fontsize=9)
-    fig.suptitle("Available private-client runs by fold and defense", y=1.03, fontsize=14)
+    private_validation["epsilon_label"] = private_validation["epsilon"].map(
+        lambda value: "None" if pd.isna(value) else f"{float(value):g}"
+    )
+    utility_summary = private_validation.groupby(["defense", "epsilon_label"], dropna=False).agg(
+        folds=("fold", "nunique"), mean_ACC=("SER ACC", "mean"), sd_ACC=("SER ACC", lambda values: values.std(ddof=0)),
+        mean_UAR=("SER UAR", "mean"), sd_UAR=("SER UAR", lambda values: values.std(ddof=0)),
+    ).reset_index()
+    display(utility_summary.round(4))
+    x_labels = ["None", "1", "5", "10", "25", "50"]
+    x_values = np.arange(len(x_labels))
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.6), sharex=True)
+    for defense, group in utility_summary.groupby("defense", sort=False):
+        group = group.set_index("epsilon_label").reindex(x_labels)
+        x = x_values
+        axes[0].errorbar(x, group["mean_ACC"], yerr=group["sd_ACC"].fillna(0), marker="o", capsize=3, label=defense)
+        axes[1].errorbar(x, group["mean_UAR"], yerr=group["sd_UAR"].fillna(0), marker="o", capsize=3, label=defense)
+    for ax, metric, title in zip(axes, ["mean_ACC", "mean_UAR"], ["SER accuracy", "SER unweighted average recall"]):
+        ax.set(title=title, xlabel="Defense epsilon (None = unprotected)", ylabel="Score", xticks=x_values, xticklabels=x_labels, ylim=(0, 1))
+        ax.grid(axis="y", alpha=0.25)
+    axes[1].legend(title="Defense", frameon=False)
+    fig.suptitle("Three-defense SER utility, mean ± fold standard deviation", y=1.02)
     fig.tight_layout()
     plt.show()"""
     ),
@@ -250,18 +260,34 @@ if not attack_df.empty:
             "metric": "attack_uasr", "score": row["attack UASR"]
         }])], ignore_index=True)
 
-display(attack_comparison.round(4))
-fig, axes = plt.subplots(1, 2, figsize=(12, 4.6), sharey=True)
-for ax, metric, title in zip(axes, ["attack_sr", "attack_uasr"], ["Attack success rate", "Unweighted average success recall"]):
-    frame = attack_comparison[attack_comparison["metric"] == metric]
-    for source, group in frame.groupby("source", sort=False):
-        ax.scatter(group["fold"].astype(str), group["score"], s=70, label=source)
-    ax.set(title=title, xlabel="Fold / diagnostic", ylabel="Score", ylim=(0, 1))
-    ax.tick_params(axis="x", rotation=20)
-axes[1].legend(frameon=True, fontsize=8)
-fig.suptitle("Published attack baseline and local defense runs", y=1.03)
-fig.tight_layout()
-plt.show()"""
+if not attack_df.empty:
+    attack_summary = attack_df.groupby(["defense", "epsilon", "updates per client"], dropna=False).agg(
+        folds=("fold", "nunique"), mean_SR=("attack SR", "mean"), sd_SR=("attack SR", lambda values: values.std(ddof=0)),
+        mean_UASR=("attack UASR", "mean"), sd_UASR=("attack UASR", lambda values: values.std(ddof=0)),
+    ).reset_index()
+    display(attack_summary.round(4))
+    labels = ["None", "1", "5", "10", "25", "50"]
+    fig, axes = plt.subplots(3, 2, figsize=(12, 11), sharex=True, sharey=True)
+    for row, count in enumerate([5, 10, 100]):
+        count_rows = attack_summary[attack_summary["updates per client"] == count]
+        for col, (mean_metric, sd_metric, title) in enumerate([
+            ("mean_SR", "sd_SR", "Attack success rate"),
+            ("mean_UASR", "sd_UASR", "Unweighted average success recall"),
+        ]):
+            ax = axes[row, col]
+            for defense, group in count_rows.groupby("defense", sort=False):
+                group = group.copy()
+                group["label"] = group["epsilon"].map(lambda value: "None" if pd.isna(value) else f"{float(value):g}")
+                group = group.set_index("label").reindex(labels)
+                ax.errorbar(np.arange(len(labels)), group[mean_metric], yerr=group[sd_metric].fillna(0), marker="o", capsize=2, label=defense)
+            ax.set(title=f"{title} · requested n={count}", ylabel="Score", ylim=(0, 1), xticks=np.arange(len(labels)), xticklabels=labels)
+            ax.grid(axis="y", alpha=0.25)
+    for ax in axes[-1, :]:
+        ax.set_xlabel("Defense epsilon (None = unprotected)")
+    axes[0, 1].legend(title="Defense", frameon=False)
+    fig.suptitle("Three-defense gender-inference attack results, mean ± fold standard deviation\\nCPU-downsampled attack model", y=1.02)
+    fig.tight_layout()
+    plt.show()"""
     ),
     nbf.v4.new_markdown_cell(
         """## 5. Interpretation and reproduction caveats
@@ -275,7 +301,8 @@ For UDP, ε labels follow the cited reference formula and its δ=0.5 assumption;
 - [x] Run baseline and UDP SER training for all three folds; UDP covers ε = 1, 5, 10, 25, 50.
 - [x] Generate source-conditioned Voice-Ind and Gender-Ind audio for all five epsilon settings (4,799 clips per setting).
 - [x] Run baseline/UDP attack diagnostics for requested n = 5, 10, 100 across folds; these use the downsampled CPU attack model.
-- [ ] Extract EmoBase features from replacement audio, train the Voice-Ind/Gender-Ind SER models for all folds, then run their attacks.
+- [x] Extract EmoBase features from replacement audio and evaluate Voice-Ind/Gender-Ind SER utility across all folds and five epsilon settings.
+- [x] Run Voice-Ind/Gender-Ind attack evaluation for requested n = 5, 10, 100 across all folds and epsilon settings using the downsampled CPU diagnostic model.
 - [ ] Run the full reference attack CNN or GPU equivalent before claiming direct paper-level attack-score comparability.
 - [x] Keep exact-vs-inferred decisions current in `reproduction_decisions.md`.
 - [ ] Add class-wise/subgroup and audio-quality analyses for the thesis study.

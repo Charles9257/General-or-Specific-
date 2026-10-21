@@ -74,6 +74,9 @@ def main() -> None:
     attack_rows: list[dict] = []
     for attack_path in sorted(path for path in runs.glob("fold*/attack*.json") if "pilot" not in path.stem):
         result = load_json(attack_path)
+        # Ignore legacy pilot JSONs that predate the defense/fold metadata schema.
+        if not result.get("defense"):
+            continue
         fold = result.get("fold")
         if fold is None:
             for part in attack_path.parts:
@@ -150,21 +153,41 @@ def main() -> None:
 
     paper_acc = sum(item["acc"] for item in PAPER_BASELINE.values()) / 3
     paper_uar = sum(item["uar"] for item in PAPER_BASELINE.values()) / 3
+    attack_groups: dict[tuple, list[dict]] = defaultdict(list)
+    for row in attack_rows:
+        attack_groups[(row["defense"], row["epsilon"], row["requested_updates"])].append(row)
     lines.extend([
         "",
         f"Paper baseline three-fold mean: ACC={paper_acc:.4f}, UAR={paper_uar:.4f}.",
         "",
-        "## Gender inference attack",
+        "## Gender-inference attack (three folds)",
         "",
-        f"Attack artifacts currently present: {len(attack_rows)}. Review `attack_fold_comparison.csv` for requested and actual update counts; the 100-requested setting can be capped by the available per-client history.",
+        f"Attack evaluation artifacts completed: {len(attack_rows)}. The table reports means and population SD across the three folds; review `attack_fold_comparison.csv` for per-fold scores and actual update counts. The 100-requested setting is capped by each client's available history when necessary.",
         "",
-        "Paper unprotected folds (SR/UASR): " + "; ".join(
+        "| Defense | Epsilon | Requested updates | Folds | Mean SR | SD SR | Mean UASR | SD UASR |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|",
+    ])
+    for (defense, epsilon, requested), rows in sorted(
+        attack_groups.items(),
+        key=lambda item: (item[0][0], float(item[0][1] or 0), int(item[0][2] or 0)),
+    ):
+        sr = [float(row["success_rate"]) for row in rows if row["success_rate"] is not None]
+        uasr = [float(row["uasr"]) for row in rows if row["uasr"] is not None]
+        mean = lambda xs: sum(xs) / len(xs) if xs else float("nan")
+        sd = lambda xs: (sum((x - mean(xs)) ** 2 for x in xs) / len(xs)) ** 0.5 if xs else float("nan")
+        lines.append(
+            f"| {defense} | {epsilon if epsilon is not None else '—'} | {requested} | {len(rows)} | "
+            f"{mean(sr):.4f} | {sd(sr):.4f} | {mean(uasr):.4f} | {sd(uasr):.4f} |"
+        )
+    lines.extend([
+        "",
+        "All local attack results use the downsampled CPU CNN (`fast` artifacts), so they are diagnostics and cannot be directly compared with the paper's full-CNN attack scores. The paper's unprotected folds (SR/UASR): " + "; ".join(
             f"F{fold} {v['sr']:.3f}/{v['uasr']:.3f}" for fold, v in PAPER_BASELINE.items()
         ) + ".",
         "",
         "## Interpretation",
         "",
-        "Numerical differences are not automatically defence effects. The paper does not publish exact fold seeds or the Voice-Ind/Gender-Ind embedding/TTS checkpoints and public pools. Local substitutions are identified in the methods and decisions files.",
+        "UDP retains near-baseline SER utility from epsilon 5 upward, while its epsilon 1 setting incurs a clear utility drop. Voice-Ind and Gender-Ind have low SER utility in this implementation, indicating a substantial transformed-speech/model mismatch. Reduced local attack scores do not by themselves establish privacy improvement because the attack CNN is downsampled, the score aggregates are not paper-matched, and transformed-audio attack results are sensitive to the substitute embeddings/TTS. The paper does not publish exact fold seeds or the Voice-Ind/Gender-Ind embedding/TTS checkpoints and public pools; see `reproduction_decisions.md` for all deviations.",
         "",
     ])
     (output / "reproduction_summary.md").write_text("\n".join(lines), encoding="utf-8")

@@ -56,7 +56,11 @@ def main() -> None:
             for chunk in iter(lambda: audio_stream.read(1024 * 1024), b""):
                 audio_hash.update(chunk)
         cache_key = audio_hash.hexdigest()
+        # Reuse features extracted earlier in this same batch as well as the
+        # persistent cache; identical replacement audio occurs across rows.
         vector = feature_cache.get(cache_key)
+        if vector is None:
+            vector = new_features.get(cache_key)
         if vector is None:
             frame = smile.process_file(str(audio_path))
             if frame.shape[0] != 1:

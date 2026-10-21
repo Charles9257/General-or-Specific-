@@ -16,11 +16,11 @@ The attacker is an honest-but-curious server. It observes client updates, trains
 
 ## Analysis and results notebook
 
-- Open [`notebooks/results_viewer.ipynb`](notebooks/results_viewer.ipynb) to view the currently available SER and attack results. The notebook loads local run JSON files and plots available results; rerun it after adding new runs.
+- Open [`notebooks/results_viewer.ipynb`](notebooks/results_viewer.ipynb) to compare all three folds, the unprotected baseline, UDP, Voice-Ind, and Gender-Ind. It reads local run JSON files when available and falls back to the committed result tables.
 - Read [`paper_analysis_for_phd.md`](paper_analysis_for_phd.md) for a detailed account of the paper's methods, materials, threat model, system architecture, experimental design, findings, limitations, and research gaps mapped to the PhD topic.
 - Rebuild the notebook with `python scripts/build_results_notebook.py`.
 
-Run outputs under `outputs/` are local and excluded from version control. Use `scripts/summarize_reproduction.py` to write versionable fold-comparison tables under `results/`, then rebuild and run the notebook to inspect them.
+Most run outputs under `outputs/` are local and excluded from version control. The compact per-fold tables under `results/` are versioned so the notebook remains useful in a clone without the local run-artifact tree.
 
 ## Published settings to reproduce
 
@@ -32,7 +32,7 @@ Run outputs under `outputs/` are local and excluded from version control. Use `s
 - 30 actors are shadow clients; the rest are private/test clients.
 - Evaluate the attack using 5, 10, and 100 observed first-layer gradients/updates.
 
-The unprotected table reports (attack SR/UASR; SER ACC/UAR): Fold 1 `0.837/0.829; 0.663/0.595`, Fold 2 `0.847/0.838; 0.666/0.601`, Fold 3 `0.817/0.791; 0.656/0.619`. These are the comparison targets for the first baseline run.
+The unprotected table reports (attack SR/UASR; SER ACC/UAR): Fold 1 `0.837/0.829; 0.663/0.595`, Fold 2 `0.847/0.838; 0.666/0.601`, Fold 3 `0.817/0.791; 0.656/0.619`. These are comparison targets; local numerical matches are not guaranteed because the paper omits fold assignments/seeds and defense assets.
 
 ## Important implementation gaps
 
@@ -101,6 +101,9 @@ Reference sources: [target 2023 paper (DOI)](https://doi.org/10.1109/ICASSP49357
 - [x] Reconcile reference model, UDP, update-observation, and label choices with the target paper; document inferred details.
 - [x] Extract SpeechBrain speaker x-vectors; train a separate held-out-actor gender embedding model; sample replacement vectors over the epsilon grid.
 - [x] Validate one source-conditioned ESPnet VITS resynthesis clip.
-- [ ] Complete source-conditioned Voice-Ind/Gender-Ind synthesis and feature extraction over the epsilon grid.
-- [ ] Evaluate SER and gender attack metrics across all three folds and defense settings.
-- [ ] Compare per-fold outputs with the paper and document nonrecoverable split/checkpoint details, including actual update counts for the 100-requested setting.
+- [x] Complete source-conditioned Voice-Ind/Gender-Ind synthesis and feature extraction over the epsilon grid (4,799 clips per defense/epsilon; generated WAVs are local and not tracked).
+- [x] Evaluate Voice-Ind/Gender-Ind SER utility across all three folds and epsilon settings.
+- [x] Finish requested 5/10/100-update attack evaluations for Voice-Ind/Gender-Ind across the three folds and five epsilon settings using the CPU-downsampled attack CNN.
+- [x] Regenerate the comparison notebook/tables with fold-level results and attack diagnostics.
+- [ ] Run the full reference attack CNN or GPU equivalent before claiming direct paper-level attack-score comparability.
+- [x] Compare per-fold outputs with the paper and document nonrecoverable split/checkpoint details, including actual update counts for the 100-requested setting.
