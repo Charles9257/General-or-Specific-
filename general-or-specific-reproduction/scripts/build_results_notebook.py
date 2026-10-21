@@ -18,7 +18,7 @@ This notebook is the results dashboard for the three-fold CREMA-D reproduction. 
 
 ## Current evidence at a glance
 
-The project evaluates three defenses: UDP, Voice-Ind, and Gender-Ind. The notebook loads fold-level private-client SER accuracy/UAR and gender-inference SR/UASR from local run artifacts, with mean and spread across folds. Voice-Ind/Gender-Ind rely on a substitute public embedding pool and LibriTTS VITS checkpoint because the paper does not identify its exact assets. Local attack CNN results use a CPU-friendly downsampled diagnostic and are not directly comparable to the paper's full attack model. Generated audio is kept locally; its 10-setting clip counts are in [`results/audio_generation_manifest.csv`](../results/audio_generation_manifest.csv).
+The project evaluates three defenses: UDP, Voice-Ind, and Gender-Ind. The notebook loads fold-level private-client SER accuracy/UAR and gender-inference SR/UASR from local run artifacts, with mean and spread across folds. Voice-Ind/Gender-Ind rely on substitute embeddings and a LibriTTS VITS checkpoint because the paper does not identify its exact assets. Most local attack results use a CPU-friendly downsampled diagnostic; one full reference-CNN benchmark is recorded, but it is not a complete full-CNN grid. Generated audio is kept locally; its 10-setting clip counts are in [`results/audio_generation_manifest.csv`](../results/audio_generation_manifest.csv).
 
 | Fold | Paper baseline ACC/UAR | Reproduction ACC/UAR |
 |---|---:|---:|
@@ -148,7 +148,7 @@ if attack_df.empty:
         print("Using committed attack summary CSV; local attack JSON files are not present.")
 if not attack_df.empty:
     display(attack_df.round(4))
-    attack_summary = attack_df.groupby(["defense", "epsilon", "updates per client"], dropna=False).agg(
+    attack_summary = attack_df.groupby(["defense", "epsilon", "updates per client", "downsampled attack"], dropna=False).agg(
         folds=("fold", "nunique"), mean_SR=("attack SR", "mean"), sd_SR=("attack SR", lambda values: values.std(ddof=0)),
         mean_UASR=("attack UASR", "mean"), sd_UASR=("attack UASR", lambda values: values.std(ddof=0)),
     ).reset_index()
@@ -261,15 +261,18 @@ if not attack_df.empty:
         }])], ignore_index=True)
 
 if not attack_df.empty:
-    attack_summary = attack_df.groupby(["defense", "epsilon", "updates per client"], dropna=False).agg(
+    attack_summary = attack_df.groupby(["defense", "epsilon", "updates per client", "downsampled attack"], dropna=False).agg(
         folds=("fold", "nunique"), mean_SR=("attack SR", "mean"), sd_SR=("attack SR", lambda values: values.std(ddof=0)),
         mean_UASR=("attack UASR", "mean"), sd_UASR=("attack UASR", lambda values: values.std(ddof=0)),
     ).reset_index()
     display(attack_summary.round(4))
+    print("Reference-CNN runs currently available (incomplete grid):")
+    display(attack_df[attack_df["downsampled attack"] == False][["fold", "defense", "epsilon", "updates per client", "attack SR", "attack UASR"]].round(4))
+    plot_summary = attack_summary[attack_summary["downsampled attack"] == True]
     labels = ["None", "1", "5", "10", "25", "50"]
     fig, axes = plt.subplots(3, 2, figsize=(12, 11), sharex=True, sharey=True)
     for row, count in enumerate([5, 10, 100]):
-        count_rows = attack_summary[attack_summary["updates per client"] == count]
+        count_rows = plot_summary[plot_summary["updates per client"] == count]
         for col, (mean_metric, sd_metric, title) in enumerate([
             ("mean_SR", "sd_SR", "Attack success rate"),
             ("mean_UASR", "sd_UASR", "Unweighted average success recall"),

@@ -155,7 +155,7 @@ def main() -> None:
     paper_uar = sum(item["uar"] for item in PAPER_BASELINE.values()) / 3
     attack_groups: dict[tuple, list[dict]] = defaultdict(list)
     for row in attack_rows:
-        attack_groups[(row["defense"], row["epsilon"], row["requested_updates"])].append(row)
+        attack_groups[(row["defense"], row["epsilon"], row["requested_updates"], row["attack_model_downsampled"])].append(row)
     lines.extend([
         "",
         f"Paper baseline three-fold mean: ACC={paper_acc:.4f}, UAR={paper_uar:.4f}.",
@@ -164,24 +164,24 @@ def main() -> None:
         "",
         f"Attack evaluation artifacts completed: {len(attack_rows)}. The table reports means and population SD across the three folds; review `attack_fold_comparison.csv` for per-fold scores and actual update counts. The 100-requested setting is capped by each client's available history when necessary.",
         "",
-        "| Defense | Epsilon | Requested updates | Folds | Mean SR | SD SR | Mean UASR | SD UASR |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|",
+        "| Defense | Epsilon | Requested updates | Attack CNN | Folds | Mean SR | SD SR | Mean UASR | SD UASR |",
+        "|---|---:|---:|---|---:|---:|---:|---:|---:|",
     ])
-    for (defense, epsilon, requested), rows in sorted(
+    for (defense, epsilon, requested, downsampled), rows in sorted(
         attack_groups.items(),
-        key=lambda item: (item[0][0], float(item[0][1] or 0), int(item[0][2] or 0)),
+        key=lambda item: (item[0][0], float(item[0][1] or 0), int(item[0][2] or 0), bool(item[0][3])),
     ):
         sr = [float(row["success_rate"]) for row in rows if row["success_rate"] is not None]
         uasr = [float(row["uasr"]) for row in rows if row["uasr"] is not None]
         mean = lambda xs: sum(xs) / len(xs) if xs else float("nan")
         sd = lambda xs: (sum((x - mean(xs)) ** 2 for x in xs) / len(xs)) ** 0.5 if xs else float("nan")
         lines.append(
-            f"| {defense} | {epsilon if epsilon is not None else '—'} | {requested} | {len(rows)} | "
+            f"| {defense} | {epsilon if epsilon is not None else '—'} | {requested} | {'downsampled' if downsampled else 'reference'} | {len(rows)} | "
             f"{mean(sr):.4f} | {sd(sr):.4f} | {mean(uasr):.4f} | {sd(uasr):.4f} |"
         )
     lines.extend([
         "",
-        "All local attack results use the downsampled CPU CNN (`fast` artifacts), so they are diagnostics and cannot be directly compared with the paper's full-CNN attack scores. The paper's unprotected folds (SR/UASR): " + "; ".join(
+        "The full reference CNN has so far been run only for the unprotected fold-1, 5-update configuration as a runtime benchmark; do not treat that single result as a completed full-CNN comparison. Downsampled CPU results are diagnostics and are not directly comparable with paper full-CNN scores. The paper's unprotected folds (SR/UASR): " + "; ".join(
             f"F{fold} {v['sr']:.3f}/{v['uasr']:.3f}" for fold, v in PAPER_BASELINE.items()
         ) + ".",
         "",
