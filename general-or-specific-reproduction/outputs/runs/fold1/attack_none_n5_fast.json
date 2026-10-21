@@ -1,0 +1,11 @@
+{
+  "num_samples_per_client": 5,
+  "shadow_actors": 30,
+  "private_actors": 61,
+  "shadow_update_events": 600,
+  "private_update_events": 1200,
+  "success_rate": 0.6491803278688525,
+  "unweighted_average_success_recall": 0.6351579520697168,
+  "best_validation_loss": 0.0017058389688221116,
+  "epochs_run": 40
+}

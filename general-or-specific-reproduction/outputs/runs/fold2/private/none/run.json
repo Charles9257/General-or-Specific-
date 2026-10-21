@@ -1,0 +1,19 @@
+{
+  "fold": 2,
+  "role": "private",
+  "defense": "none",
+  "feature_privacy": "plain",
+  "epsilon": null,
+  "clients": 61,
+  "rounds": 200,
+  "participation": 0.1,
+  "local_epochs": 1,
+  "batch_size": 20,
+  "learning_rate": 0.0005,
+  "clip": null,
+  "delta": null,
+  "udp_noise_scale_range": null,
+  "input_size": 988,
+  "features": "C:\\Users\\charl\\OneDrive\\Documents\\PhD\\general-or-specific-reproduction\\outputs\\emobase.npz",
+  "normalization": "per_actor_zscore_all_actor_clips_reference_preprocessing"
+}

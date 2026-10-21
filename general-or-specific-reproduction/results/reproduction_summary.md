@@ -17,7 +17,7 @@ Paper baseline three-fold mean: ACC=0.6617, UAR=0.6050.
 
 ## Gender inference attack
 
-Attack artifacts currently present: 4. Review `attack_fold_comparison.csv` for requested and actual update counts; the 100-requested setting can be capped by the available per-client history.
+Attack artifacts currently present: 55. Review `attack_fold_comparison.csv` for requested and actual update counts; the 100-requested setting can be capped by the available per-client history.
 
 Paper unprotected folds (SR/UASR): F1 0.837/0.829; F2 0.847/0.838; F3 0.817/0.791.
 

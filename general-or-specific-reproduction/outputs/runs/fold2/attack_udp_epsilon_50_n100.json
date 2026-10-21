@@ -1,0 +1,25 @@
+{
+  "num_samples_per_client": 100,
+  "fold": 2,
+  "defense": "udp",
+  "epsilon": 50.0,
+  "observed_samples_per_private_client": {
+    "min": 9,
+    "max": 32,
+    "mean": 19.672131147540984
+  },
+  "observed_samples_per_shadow_client": {
+    "min": 10,
+    "max": 28,
+    "mean": 20.0
+  },
+  "attack_model_downsampled": true,
+  "shadow_actors": 30,
+  "private_actors": 61,
+  "shadow_update_events": 600,
+  "private_update_events": 1200,
+  "success_rate": 0.6229508196721312,
+  "unweighted_average_success_recall": 0.6217532467532467,
+  "best_validation_loss": 0.00039816599261636537,
+  "epochs_run": 40
+}

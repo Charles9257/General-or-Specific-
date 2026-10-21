@@ -72,13 +72,19 @@ def main() -> None:
         writer.writerows(ser_rows)
 
     attack_rows: list[dict] = []
-    for attack_path in sorted(runs.glob("fold*/attack*.json")):
+    for attack_path in sorted(path for path in runs.glob("fold*/attack*.json") if "pilot" not in path.stem):
         result = load_json(attack_path)
+        fold = result.get("fold")
+        if fold is None:
+            for part in attack_path.parts:
+                if part.startswith("fold") and part[4:].isdigit():
+                    fold = int(part[4:])
+                    break
         count_private = result.get("observed_samples_per_private_client", {})
         count_shadow = result.get("observed_samples_per_shadow_client", {})
         attack_rows.append({
             "source": "reproduction",
-            "fold": result.get("fold"),
+            "fold": fold,
             "defense": result.get("defense"),
             "epsilon": result.get("epsilon"),
             "requested_updates": result.get("num_samples_per_client"),
@@ -102,6 +108,24 @@ def main() -> None:
         writer = csv.DictWriter(stream, fieldnames=attack_fields)
         writer.writeheader()
         writer.writerows(attack_rows)
+
+    audio_manifest = []
+    for defense in ("voice-ind", "gender-ind"):
+        for epsilon in (1, 5, 10, 25, 50):
+            audio_dir = project / "outputs" / "audio" / f"{defense}-e{epsilon}"
+            clips = list(audio_dir.glob("*.wav")) if audio_dir.is_dir() else []
+            audio_manifest.append({
+                "defense": defense,
+                "epsilon": epsilon,
+                "expected_clips": 4799,
+                "generated_clips": len(clips),
+                "audio_complete": len(clips) == 4799,
+                "audio_directory": audio_dir.relative_to(project).as_posix(),
+            })
+    with (output / "audio_generation_manifest.csv").open("w", encoding="utf-8", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=list(audio_manifest[0]))
+        writer.writeheader()
+        writer.writerows(audio_manifest)
 
     groups: dict[tuple, list[dict]] = defaultdict(list)
     for row in ser_rows:
@@ -146,6 +170,7 @@ def main() -> None:
     (output / "reproduction_summary.md").write_text("\n".join(lines), encoding="utf-8")
     print(f"Wrote {output / 'ser_fold_comparison.csv'}")
     print(f"Wrote {output / 'attack_fold_comparison.csv'}")
+    print(f"Wrote {output / 'audio_generation_manifest.csv'}")
     print(f"Wrote {output / 'reproduction_summary.md'}")
 
 

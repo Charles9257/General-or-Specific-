@@ -1,0 +1,11 @@
+defense,epsilon,expected_clips,generated_clips,audio_complete,audio_directory
+voice-ind,1,4799,4799,True,outputs/audio/voice-ind-e1
+voice-ind,5,4799,4799,True,outputs/audio/voice-ind-e5
+voice-ind,10,4799,4799,True,outputs/audio/voice-ind-e10
+voice-ind,25,4799,4799,True,outputs/audio/voice-ind-e25
+voice-ind,50,4799,4799,True,outputs/audio/voice-ind-e50
+gender-ind,1,4799,4799,True,outputs/audio/gender-ind-e1
+gender-ind,5,4799,4799,True,outputs/audio/gender-ind-e5
+gender-ind,10,4799,4799,True,outputs/audio/gender-ind-e10
+gender-ind,25,4799,4799,True,outputs/audio/gender-ind-e25
+gender-ind,50,4799,4799,True,outputs/audio/gender-ind-e50
